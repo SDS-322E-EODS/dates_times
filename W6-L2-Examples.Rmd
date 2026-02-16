@@ -1,0 +1,235 @@
+---
+title: "W6-L2-Lecture-Examples"
+author: "Dr. Coleman"
+output: html_document
+---
+
+## Dates and Times
+
+## Underlying representations as integers
+
+```{r}
+
+# Get system date
+Sys.Date()
+
+# Represent as integer
+Sys.Date() |>
+    as.integer()
+
+# Get system time
+Sys.time()
+
+# Represent as integer
+Sys.time() |>
+    as.integer()
+```
+
+## Working With Dates
+
+```{r}
+
+library(tidyverse)
+
+# all these output the same date
+mdy("2/18/2026")
+dmy("18 Feb 2026")
+ymd("2026/02-18")
+```
+
+## Working With Times
+
+```{r}
+
+ymd_hms("2026-02-18 04:50:13 PM")
+mdy_hm("2/18/2026 04:50 PM")
+ymd_hm("2026/2/18 04:50 AM EST") # EST ignored
+```
+
+## Working With Times/Time Zones
+
+```{r}
+
+ymd_hm("2026/2/18 04:50 PM EST",
+       tz = "America/New_York")
+
+ymd_hm("2026/2/18 04:50 PM CST",
+       tz = "America/Chicago")
+ymd_hm("2026/2/18 04:50 PM CST",
+       tz = "CST6CDT")
+```
+
+## Date/Time Operations
+
+Basic difference example
+
+```{r}
+
+x <- ymd("2012-01-01", tz = "")      ## Midnight 
+y <- dmy_hms("9 Jan 2011 11:34:21", tz = "")
+
+x-y
+```
+
+Adding datetimes is nonsensical
+
+```{r, eval = FALSE}
+
+x + y 
+
+# Error in `+.POSIXt`(x, y) :
+# binary '+' is not defined for "POSIXt" objects
+```
+
+Leap Year Example
+
+```{r}
+
+x <- ymd("2024-03-01")
+y <- ymd("2024-02-28") 
+
+x-y
+```
+
+UTC and System Time example
+
+```{r}
+
+x <- ymd_hms("2022-10-25 01:00:00", tz = "")
+y <- ymd_hms("2022-10-25 01:00:00", tz = "UTC") 
+
+x-y
+```
+
+Other Helpful Functions
+
+```{r}
+
+x <- ymd_hms(c("2022-10-25 01:13:46", 
+               "2015-04-23 15:11:23"), 
+             tz = "")
+x
+
+year(x)
+month(x)
+day(x)
+weekdays(x)
+hour(x)
+minute(x)
+second(x)
+week(x)
+```
+
+## Austin 311 data
+
+From <https://data.austintexas.gov>
+
+```{r}
+
+## Read the data
+dat <- read_csv("PARD_311_Data_20250218.csv.bz2")
+dat
+
+## Quick look
+glimpse(dat)
+
+## What kinds of service requests are there?
+table(dat$`SR Description`)
+
+## Make a bar plot of the SR Description variable
+dat |>
+    ggplot(aes(x = `SR Description`)) +
+    geom_bar() +
+    coord_flip()
+
+glimpse(dat)
+
+
+## Convert date variables into R date format
+dat <- dat |>
+    mutate(datetime = mdy_hms(`Created Date`, tz = ""),
+           close = mdy_hms(`Close Date`, tz = ""))
+
+## Look at newly created variables
+dat |>
+    select(`Created Date`, datetime, close)
+
+
+## Show total number of service requests by month
+dat |>
+    mutate(month = month(datetime)) |>
+    group_by(month) |>
+    summarize(n = n()) |>
+    ggplot(aes(x = month, y = n)) +
+    geom_point() +
+    geom_line() +
+    scale_x_continuous(breaks = 1:12, 
+                       labels = month.abb)
+
+month.abb
+month.name
+
+## Show total number of service requests by month and year
+dat |>
+    mutate(month = month(datetime),
+           year = year(datetime)) |>
+    group_by(year, month) |>
+    summarize(n = n()) |>
+    ggplot(aes(x = month, y = n)) +
+    geom_point() +
+    geom_line() +
+    facet_wrap(vars(year)) +
+    scale_x_continuous(breaks = 1:12)
+
+## Distribution of time to close a service request
+dat |>
+    mutate(date = as.Date(datetime),
+           closedate = as.Date(close)) |>
+    select(date, closedate) |>
+    mutate(timetoclose = as.integer(closedate - date)) |>
+    select(timetoclose) |>
+    summary()
+
+## Plot distribution of time to close a service request
+dat |>
+    mutate(date = as.Date(datetime),
+           closedate = as.Date(close)) |>
+    select(date, closedate) |>
+    mutate(timetoclose = as.integer(closedate - date)) |>
+    select(timetoclose) |>
+    filter(!is.na(timetoclose)) |>
+    ggplot(aes(x = timetoclose)) +
+    geom_histogram(bins = 20)
+
+## Look at times less than 60 days
+dat |>
+    mutate(date = as.Date(datetime),
+           closedate = as.Date(close)) |>
+    select(date, closedate) |>
+    mutate(timetoclose = as.integer(closedate - date)) |>
+    filter(!is.na(timetoclose)) |>
+    filter(timetoclose < 60) |>
+    ggplot(aes(x = timetoclose)) +
+    geom_histogram(bins = 20)
+
+## Show daily number of service requests
+dat |>
+    mutate(date = as.Date(datetime)) |>
+    group_by(date) |>
+    summarize(n = n()) |>
+    arrange(date) |>
+    ggplot(aes(x = date, y = n)) +
+    geom_line()
+
+
+## Show daily number of service requests by ZIP code
+dat |>
+    mutate(date = as.Date(datetime)) |>
+    rename(zipcode = `Zip Code`) |>
+    group_by(zipcode, date) |>
+    summarize(n = n()) |>
+    arrange(date) |>
+    ggplot(aes(x = date, y = n)) +
+    geom_point() +
+    facet_wrap(vars(zipcode))
+```
